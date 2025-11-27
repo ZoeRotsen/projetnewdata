@@ -15,7 +15,7 @@ export async function getData() {
   return await collection.find().toArray();
 }
 
-export async function getData(id) {
+export async function getDataById(id) {
   var collection = await getCollection();
   return await collection.find({"_id":id}).toArray();
 }

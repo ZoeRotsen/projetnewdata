@@ -1,8 +1,5 @@
-//Imports
 import express from "express";
 import { getData } from "./db.js";
-import { postData } from "./db.js";
-import { postDataForm } from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
