@@ -16,8 +16,8 @@ app.use(express.urlencoded({ extended: true }));
 // Servir les fichiers statiques (HTML, JS, CSS)
 app.use(express.static(path.join(__dirname, "public")));
 
-// Route API pour récupérer les données MongoDB
-app.get("/data", async (req, res) => {
+// Route API pour renvoyer tous les points
+app.get("/api/items", async (req, res) => {
   try {
     const data = await getData();
     res.json(data);
@@ -27,9 +27,22 @@ app.get("/data", async (req, res) => {
   }
 });
 
+// Route API pour renvoyer un point spécifique
+app.get("/api/items/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    (!id)
+    const data = await getData(id);
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la récupération des données" });
+  }
+});
 
-// Route API pour modifier les données MongoDB
-app.post("/inject", async (req,res) => {
+
+// Route API pour ajouter un point
+app.post("/api/items", async (req,res) => {
   try {
     var response = await postData(req.body);
     res.json(response);
@@ -39,10 +52,11 @@ app.post("/inject", async (req,res) => {
   }
 });
 
-// Route API pour ajouter une entrée MongoDB
-app.post("/add", async (req, res) => {
+// Route API pour modifier un point
+app.put("/api/items/:id", async (req, res) => {
   try {
-    (!req.body)
+    const id = req.params.id;
+    (!req.body && !id)
     console.log("Body reçu du formulaire :", req.body);
     const response = await postDataForm(req.body);
     console.log("Response de la base :", response)
