@@ -20,6 +20,11 @@ export async function getDataById(id) {
   return await collection.find({"_id":id}).toArray();
 }
 
+export async function getDeleteById(id) {
+  var collection = await getCollection();
+  return await collection.deleteOne({"_id":id})
+}
+
 /*export async function postData(p){
   var collection = await getCollection();
   return await collection.insertMany(p);
