@@ -37,20 +37,30 @@
 
     <h2 class="m-3">Carte des restaurants</h2>
 
-    <div id="stats-panel" class="card shadow p-3">
-      <label for="stats-select" class="form-label fw-bold">Statistiques</label>
-      <select id="stats-select" class="form-select mb-3">
-        <option value="message">Sélectionner une statistique</option>
-        <option value="moyenneCuisine">Score moyen par cuisine</option>
-      </select>
+  <div id="stats-panel" class="card shadow p-3">
+    <label for="stats-select" class="form-label fw-bold">Statistiques</label>
+    <select id="stats-select" class="form-select mb-3">
+      <option value="message">Sélectionner une statistique</option>
+      <option value="AvgScoreCuisine">Score moyen par cuisine</option>
+    </select>
 
-      <div id="stats-content" class="border rounded bg-light p-2">
-        Sélectionne une statistique
-      </div>
+    <label for="display-mode" class="form-label fw-bold">Mode d'affichage</label>
+    <select id="display-mode" class="form-select mb-3">
+      <option value="text">Texte</option>
+      <option value="chart">Graphique</option>
+    </select>
+
+    <div id="stats-content" class="border rounded bg-light p-2 mb-3" style="display: none;">
+      <!-- Texte scrollable -->
     </div>
 
-    <div id="map"></div>
+    <canvas id="stats-chart" style="display: none;"></canvas>
+  </div>
 
-    <script src="script.js"></script>
-  </body>
+
+  <div id="map"></div>
+
+  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
 </html>
