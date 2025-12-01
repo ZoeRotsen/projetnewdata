@@ -1,6 +1,6 @@
 import express from "express";
 
-import { getData } from "./db.js";
+import { getData, getScoreMoyenCuisine } from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -20,6 +20,17 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/api/items", async (req, res) => {
   try {
     const data = await getData();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la récupération des données" });
+  }
+});
+
+// Route API pour renvoyer la moyenne par cuisine
+app.get("/api/items/moyenne/cuisine", async (req, res) => {
+  try {
+    const data = await getScoreMoyenCuisine();
     res.json(data);
   } catch (err) {
     console.error(err);

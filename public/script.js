@@ -54,4 +54,30 @@ function loadMarkers() {
     });
 }
 
+function loadStats(type) {
+  const content = document.getElementById("stats-content");
+
+  if (type === "moyenneCuisine") {
+    fetch(`${baseUrl}/items/moyenne/cuisine`)
+      .then(r => r.json())
+      .then(data => {
+        console.log(data)
+        content.innerHTML = renderMoyenneCuisine(data);
+      });
+  }
+
+}
+
 initMap();
+
+document.getElementById("stats-select").addEventListener("change", e => {
+  loadStats(e.target.value);
+});
+
+function renderMoyenneCuisine(data) {
+  let html = "<b>Score moyen par cuisine :</b><br><br>";
+  data.forEach(c => {
+    html += `${c._id} : <span class="fw-bold">${c.scoreMoyen.toFixed(2)}</span><br>`;
+  });
+  return html;
+}

@@ -20,6 +20,20 @@ export async function getDataById(id) {
   return await collection.find({"_id":id}).toArray();
 }
 
+export async function getScoreMoyenCuisine() {
+  var collection = await getCollection();
+  const pipeline = [
+    { $unwind: "$grades" },
+    {
+      $group: {
+        _id: "$cuisine",
+        scoreMoyen: { $avg: "$grades.score" }
+      }
+    },
+  ];
+  return await collection.aggregate(pipeline).toArray();
+}
+
 export async function getDeleteById(id) {
   var collection = await getCollection();
   return await collection.deleteOne({"_id":id})
