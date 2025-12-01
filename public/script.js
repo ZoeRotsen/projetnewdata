@@ -66,7 +66,7 @@ function loadStats(type) {
   //Affichage des moyennes des scores de chaque cuisine
   if (type === "AvgScoreCuisine") {
     fetch(`${baseUrl}/items/avg/cuisine`)
-      .then(r => r.json())
+      .then(r=>r.json())
       .then(data => {
         //Affichage en mode texte
         if (mode === "text") {
@@ -77,8 +77,8 @@ function loadStats(type) {
           content.style.display = "none";
           canvas.style.display = "block";
 
-          const labels = data.map(avgCuisine => avgCuisine._id);
-          const scores = data.map(avgCuisine => avgCuisine.scoreMoyen.toFixed(2));
+          const labels = data.map(avgCuisine=>avgCuisine._id);
+          const scores = data.map(avgCuisine=>avgCuisine.scoreMoyen.toFixed(2));
 
           if (chartInstance) chartInstance.destroy();
 

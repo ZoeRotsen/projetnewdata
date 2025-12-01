@@ -21,19 +21,24 @@ export async function getDataById(id) {
 }
 
 export async function getAvgScoreCuisine() {
-  var collection = await getCollection();
+  const collection = await getCollection();
   const pipeline = [
-    { $unwind: "$grades" },
+    {
+      $addFields: {
+        firstScore: { $arrayElemAt: ["$grades.score", 0] }
+      }
+    },
     {
       $group: {
         _id: "$cuisine",
-        scoreMoyen: { $avg: "$grades.score" }
+        scoreMoyen: { $avg: "$firstScore" }
       }
     },
     { $sort: { scoreMoyen: -1 } }
   ];
-  console.log(collection.aggregate(pipeline).toArray())
-  return await collection.aggregate(pipeline).toArray();
+
+  const result = await collection.aggregate(pipeline).toArray();
+  return result;
 }
 
 export async function getDeleteById(id) {
