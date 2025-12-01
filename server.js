@@ -1,6 +1,6 @@
 import express from "express";
 
-import { getData, getScoreMoyenCuisine } from "./db.js";
+import { getData, getAvgScoreCuisine } from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -28,13 +28,13 @@ app.get("/api/items", async (req, res) => {
 });
 
 // Route API pour renvoyer la moyenne par cuisine
-app.get("/api/items/moyenne/cuisine", async (req, res) => {
+app.get("/api/items/avg/cuisine", async (req, res) => {
   try {
-    const data = await getScoreMoyenCuisine();
+    const data = await getAvgScoreCuisine();
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erreur lors de la récupération des données" });
+    res.status(500).json({error:"Erreur lors de la récupération des données"});
   }
 });
 
@@ -47,7 +47,7 @@ app.get("/api/items/:id", async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erreur lors de la récupération des données" });
+    res.status(500).json({error:"Erreur lors de la récupération des données"});
   }
 });
 
@@ -59,7 +59,7 @@ app.post("/api/items", async (req,res) => {
     res.json(response);
   }catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erreur lors de l'écriture des données" });
+    res.status(500).json({error:"Erreur lors de l'écriture des données"});
   }
 });
 
@@ -74,7 +74,7 @@ app.put("/api/items/:id", async (req, res) => {
     res.redirect("/");
   }catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erreur lors de l'écriture des données" });
+    res.status(500).json({error:"Erreur lors de l'écriture des données"});
   }
 });
 
@@ -87,7 +87,7 @@ app.delete("/api/items/:id", async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Erreur lors de la récupération des données" });
+    res.status(500).json({error:"Erreur lors de la récupération des données"});
   }
 });
 

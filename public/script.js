@@ -54,30 +54,74 @@ function loadMarkers() {
     });
 }
 
+//variable pour les graphiques
+var chartInstance = null;
+
+//Récupération des stats
 function loadStats(type) {
   const content = document.getElementById("stats-content");
+  const canvas = document.getElementById("stats-chart");
+  const mode = document.getElementById("display-mode").value; // texte ou graphique
 
-  if (type === "moyenneCuisine") {
-    fetch(`${baseUrl}/items/moyenne/cuisine`)
+  //Affichage des moyennes des scores de chaque cuisine
+  if (type === "AvgScoreCuisine") {
+    fetch(`${baseUrl}/items/avg/cuisine`)
       .then(r => r.json())
       .then(data => {
-        console.log(data)
-        content.innerHTML = renderMoyenneCuisine(data);
-      });
-  }
+        //Affichage en mode texte
+        if (mode === "text") {
+          content.style.display = "block";
+          canvas.style.display = "none";
+          content.innerHTML = showAvgCuisine(data);
+        } else if (mode === "chart") { //Affichage en mode graphique
+          content.style.display = "none";
+          canvas.style.display = "block";
 
+          const labels = data.map(avgCuisine => avgCuisine._id);
+          const scores = data.map(avgCuisine => avgCuisine.scoreMoyen.toFixed(2));
+
+          if (chartInstance) chartInstance.destroy();
+
+          chartInstance = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Score moyen',
+                data: scores,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: { y: { beginAtZero: true } },
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+      });
+  } else {
+    content.style.display = "none";
+    canvas.style.display = "none";
+  }
 }
 
-initMap();
-
-document.getElementById("stats-select").addEventListener("change", e => {
-  loadStats(e.target.value);
-});
-
-function renderMoyenneCuisine(data) {
-  let html = "<b>Score moyen par cuisine :</b><br><br>";
-  data.forEach(c => {
-    html += `${c._id} : <span class="fw-bold">${c.scoreMoyen.toFixed(2)}</span><br>`;
+//Rendu de l'HTML pour la moyenne des cuisines
+function showAvgCuisine(data) {
+  var html = "<b>Score moyen par cuisine :</b><br><br>";
+  data.forEach(avgCuisine => {
+    html += `${avgCuisine._id} : <span class="fw-bold">${avgCuisine.scoreMoyen.toFixed(2)}</span><br>`;
   });
   return html;
 }
+
+//Initialisation des fonctions
+initMap();
+
+document.getElementById("stats-select").addEventListener("change", e => loadStats(e.target.value));
+document.getElementById("display-mode").addEventListener("change", () => {
+  const selectedStat = document.getElementById("stats-select").value;
+  loadStats(selectedStat);
+});
