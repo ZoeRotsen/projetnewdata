@@ -1,4 +1,4 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 const uri = 'mongodb://localhost:27017';
 const client = new MongoClient(uri);
 
@@ -16,9 +16,21 @@ export async function getData() {
 }
 
 export async function getDataById(id) {
-  var collection = await getCollection();
-  return await collection.find({"_id":id}).toArray();
+  let collection = await getCollection();
+
+  // ici je transforme la chaine en ObjectId
+  let objectId;
+  try {
+    objectId = new ObjectId(id);
+  } catch (e) {
+    return null; // id pas bon
+  }
+
+  // ici je prends un seul doc
+  const doc = await collection.findOne({ _id: objectId });
+  return doc;
 }
+
 
 export async function getAvgScoreCuisine() {
   const collection = await getCollection();
@@ -41,10 +53,30 @@ export async function getAvgScoreCuisine() {
   return result;
 }
 
-export async function getDeleteById(id) {
-  var collection = await getCollection();
-  return await collection.deleteOne({"_id":id})
+// ici je supprime un resto avec son id
+export async function deleteRestaurantById(id) {
+  const collection = await getCollection();
+
+  if (!id) {
+    return { error: "Id manquant." };
+  }
+
+  let objectId;
+  try {
+    objectId = new ObjectId(id);
+  } catch (e) {
+    return { error: "Id invalide." };
+  }
+
+  const result = await collection.deleteOne({ _id: objectId });
+
+  if (result.deletedCount === 0) {
+    return { error: "Aucun document trouvé avec cet id." };
+  }
+
+  return { ok: true };
 }
+
 
 export async function insertRestaurant(doc) {
   // ici je prends la collection
@@ -96,6 +128,71 @@ export async function insertRestaurant(doc) {
   // ici j ajoute dans la base
   const result = await collection.insertOne(doc);
   return result;
+}
+
+
+// ici je modifie un resto avec son id
+export async function updateRestaurant(id, doc) {
+  const collection = await getCollection();
+
+  if (!id) {
+    return { error: "Id manquant." };
+  }
+
+  let objectId;
+  try {
+    objectId = new ObjectId(id);
+  } catch (e) {
+    return { error: "Id invalide." };
+  }
+
+  // ici je refais les memes verifs que pour insert
+  if (!doc || !doc.name || !doc.cuisine || !doc.borough) {
+    return { error: "Nom, cuisine et quartier sont obligatoires." };
+  }
+
+  if (!doc.address || !doc.address.building || !doc.address.street || !doc.address.zipcode) {
+    return { error: "Adresse incomplète (building, rue, code postal)." };
+  }
+
+  if (Array.isArray(doc.grades) && doc.grades.length > 0) {
+    let g = doc.grades[0];
+
+    if (g.score !== undefined && g.score !== null) {
+      if (typeof g.score !== "number") {
+        return { error: "Le score doit être un nombre." };
+      }
+      if (g.score < 0) {
+        return { error: "Le score ne doit pas être négatif." };
+      }
+      if (!g.grade || g.grade.trim() === "") {
+        return { error: "Le grade est obligatoire quand il y a un score." };
+      }
+    }
+  }
+
+  if (doc.restaurant_id) {
+    if (typeof doc.restaurant_id !== "string" || !/^\d+$/.test(doc.restaurant_id)) {
+      return { error: "Restaurant ID doit contenir seulement des chiffres." };
+    }
+
+    // ici je verifie que ce restaurant_id n est pas deja pris par un autre doc
+    const existing = await collection.findOne({ restaurant_id: doc.restaurant_id });
+    if (existing && existing._id.toString() !== objectId.toString()) {
+      return { error: "Ce Restaurant ID existe déjà dans la base." };
+    }
+  }
+
+  const result = await collection.updateOne(
+    { _id: objectId },
+    { $set: doc }
+  );
+
+  if (result.matchedCount === 0) {
+    return { error: "Aucun document trouvé avec cet id." };
+  }
+
+  return { ok: true };
 }
 
 

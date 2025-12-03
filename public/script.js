@@ -7,7 +7,9 @@ let allPoints = [];  // je garde tous les restos pour plus tard
 let addMode = false;  // je dis si je suis en mode ajout
 let addTempMarker = null;  // je garde le petit marker du nouveau resto
 let addFormDataCache = null;  // je garde les infos du formulaire quand je vais cliquer sur la carte
-let clusterGroup = null;// groupe de clusters
+let clusterGroup = null;  // groupe de clusters
+let editMode = false;  // je dis si je suis en mode edit
+let currentEditId = null;  // je garde l id du resto que je modifie
 
 
 // je calcule le score moyen d un resto
@@ -32,6 +34,24 @@ function getAverageScore(point) {
   }
 
   return total / count; // je fais la moyenne
+}
+
+
+// ici je prends l id du doc
+function getDocId(doc) {
+  if (!doc) {
+    return null;
+  }
+
+  if (typeof doc._id === "string") {
+    return doc._id;
+  }
+
+  if (doc._id && typeof doc._id === "object" && typeof doc._id.$oid === "string") {
+    return doc._id.$oid;
+  }
+
+  return null;
 }
 
 
@@ -94,6 +114,30 @@ function initMap() {
   map.addLayer(clusterGroup);
   loadMarkers();
 
+
+  // je regarde quand un popup s ouvre
+  map.on("popupopen", function(e) {
+    let marker = e.popup._source;   // ici je prends le marker
+    let doc = marker.restaurantDoc; // ici je prends les infos du resto
+
+    if (!doc) {
+      return;
+    }
+
+    let popupEl = e.popup.getElement();
+    if (!popupEl) {
+      return;
+    }
+
+    let editBtn = popupEl.querySelector(".popup-edit-btn");
+    let docId = getDocId(doc);
+
+    if (editBtn) {
+      editBtn.addEventListener("click", function() {
+        openEditForm(doc, docId);
+      });
+    }
+  });
 
   // je regarde les clics sur la carte
   map.on("click", function(e) {
@@ -189,7 +233,7 @@ function drawMarkers(points) {
       let avgScore = getAverageScore(point);   // je calcule la note
       let style = styleMap(point);            // je prends le style
 
-      let marker = L.circleMarker([lat, lng], style).addTo(map);
+      let marker = L.circleMarker([lat, lng], style);
 
       // je prépare le texte
       let name = point.name || "No name";
@@ -197,12 +241,16 @@ function drawMarkers(points) {
       let borough = point.borough || "No borough";
       let scoreText = (avgScore !== null) ? avgScore.toFixed(1) : "N/A";
 
+      marker.restaurantDoc = point; // ici je garde le resto
       marker.bindPopup(
         "<div class='fw-bold'>" + name + "</div>" +
         "<div class='small text-muted mb-1'>" +
           cuisine + " · " + borough +
         "</div>" +
-        "<div>Score moyen : <span class='fw-bold'>" + scoreText + "</span></div>"
+        "<div>Score moyen : <span class='fw-bold'>" + scoreText + "</span></div>" +
+        "<div class='mt-2'>" +
+          "<button class='btn btn-warning btn-sm popup-edit-btn'>EDIT</button>" +
+        "</div>"
       );
 
       clusterGroup.addLayer(marker);  // j ajoute le point dans le cluster
@@ -342,6 +390,70 @@ function showAvgCuisine(data) {
 }
 
 
+// ici je remplis le formulaire pour modifier un resto
+function openEditForm(doc, id) {
+  if (!doc || !id) {
+    return;
+  }
+
+  editMode = true;        // ici je dis que je suis en mode edition
+  currentEditId = id;     // ici je garde l id
+
+  let nameInput = document.getElementById("add-name");
+  let cuisineInput = document.getElementById("add-cuisine");
+  let boroughInput = document.getElementById("add-borough");
+  let buildingInput = document.getElementById("add-building");
+  let streetInput = document.getElementById("add-street");
+  let zipcodeInput = document.getElementById("add-zipcode");
+  let gradeInput = document.getElementById("add-grade");
+  let scoreInput = document.getElementById("add-score");
+  let restIdInput = document.getElementById("add-rest-id");
+  let latInput = document.getElementById("add-lat");
+  let lngInput = document.getElementById("add-lng");
+
+  // je remplis les champs
+  if (nameInput) nameInput.value = doc.name || "";
+  if (cuisineInput) cuisineInput.value = doc.cuisine || "";
+  if (boroughInput) boroughInput.value = doc.borough || "";
+
+  if (doc.address) {
+    if (buildingInput) buildingInput.value = doc.address.building || "";
+    if (streetInput) streetInput.value = doc.address.street || "";
+    if (zipcodeInput) zipcodeInput.value = doc.address.zipcode || "";
+    if (doc.address.coord && Array.isArray(doc.address.coord.coordinates)) {
+      let lng = doc.address.coord.coordinates[0];
+      let lat = doc.address.coord.coordinates[1];
+      if (latInput) latInput.value = lat;
+      if (lngInput) lngInput.value = lng;
+    }
+  }
+
+  if (Array.isArray(doc.grades) && doc.grades.length > 0) {
+    let g = doc.grades[0];
+    if (gradeInput) gradeInput.value = g.grade || "";
+    if (scoreInput && typeof g.score === "number") scoreInput.value = g.score;
+  } else {
+    if (gradeInput) gradeInput.value = "";
+    if (scoreInput) scoreInput.value = "";
+  }
+
+  if (restIdInput) restIdInput.value = doc.restaurant_id || "";
+
+  // j affiche le bouton supprimer
+  let deleteBtn = document.getElementById("form-delete-btn");
+  if (deleteBtn) {
+    deleteBtn.classList.remove("d-none");
+  }
+
+  // j ouvre le modal
+  if (typeof bootstrap !== "undefined") {
+    let addModalElement = document.getElementById("add-modal");
+    let addModal = bootstrap.Modal.getOrCreateInstance(addModalElement);
+    addModal.show();
+  }
+}
+
+
 // je filtre les points selon les choix
 function applyFilters() {
   if (!allPoints || allPoints.length === 0) {
@@ -455,6 +567,61 @@ if (addModalElement) {
 }
 
 
+// je recupere le bouton supprimer dans le modal
+let deleteBtn = document.getElementById("form-delete-btn");
+
+if (deleteBtn) {
+  deleteBtn.addEventListener("click", function() {
+    // ici je verifie que je suis bien en mode edition
+    if (!editMode || !currentEditId) {
+      alert("Pas de restaurant a supprimer.");
+      return;
+    }
+
+    // ici je demande si on est sur
+    let ok = confirm("Tu veux vraiment supprimer ce restaurant ?");
+    if (!ok) {
+      return;
+    }
+
+    // ici je parle avec l api pour supprimer
+    fetch(baseUrl + "/items/" + encodeURIComponent(currentEditId), {
+      method: "DELETE"
+    })
+    .then(function(res) {
+      return res.json();
+    })
+    .then(function(data) {
+      console.log("Delete response:", data);
+      if (data && data.error) {
+        alert(data.error);
+        return;
+      }
+      if (map) {
+        map.closePopup();
+      }
+
+      // ici je ferme la fenetre
+      if (addModal) {
+        addModal.hide();
+      }
+
+      // ici je remets les infos a zero
+      editMode = false;
+      currentEditId = null;
+
+      // ici je recharge les points
+      loadMarkers();
+    })
+    .catch(function(err) {
+      console.error("Erreur delete:", err);
+      alert("Erreur lors de la suppression.");
+    });
+  });
+}
+
+
+
 // je récupère le bouton pour choisir sur la carte
 let addPickMapBtn = document.getElementById("add-pick-map");
 
@@ -489,6 +656,16 @@ if (addOpenBtn && addModal) {
     // je dis que je ne suis pas encore en mode clic carte
     addMode = false;
     addFormDataCache = null; // je vide la mémoire
+
+    // je dis que je ne suis pas en mode edit
+    editMode = false;
+    currentEditId = null;
+
+    // je cache le bouton supprimer
+    let deleteBtn = document.getElementById("form-delete-btn");
+    if (deleteBtn) {
+      deleteBtn.classList.add("d-none");
+    }
 
     // je vide le formulaire
     if (addForm) {
@@ -597,6 +774,13 @@ if (addForm) {
       for (let i = 0; i < allPoints.length; i++) {
         let p = allPoints[i];
         if (p.restaurant_id && p.restaurant_id === restIdValue) {
+          let pid = getDocId(p);
+
+          // si je suis en edition et que c est le meme doc, je laisse passer
+          if (editMode && currentEditId && pid === currentEditId) {
+            continue;
+          }
+
           alert("Ce Restaurant ID existe déjà dans la base.");
           return;
         }
@@ -634,9 +818,17 @@ if (addForm) {
       newDoc.restaurant_id = restIdValue;
     }
 
-    // je parle avec l api
-    fetch(baseUrl + "/items", {
-      method: "POST",
+    // ici je choisis POST ou PUT selon le mode
+    let url = baseUrl + "/items";
+    let method = "POST";
+
+    if (editMode && currentEditId) {
+      url = baseUrl + "/items/" + encodeURIComponent(currentEditId);
+      method = "PUT";
+    }
+
+    fetch(url, {
+      method: method,
       headers: {
         "Content-Type": "application/json"
       },
@@ -646,24 +838,26 @@ if (addForm) {
         return res.json();
       })
       .then(function(data) {
-        console.log("Insert response:", data); // je regarde la reponse
+        console.log("Save response:", data);
 
-        // je regarde si le serveur dit qu il y a une erreur
         if (data && data.error) {
           alert(data.error);
-          return; // je ne ferme pas le modal, je laisse corriger
+          return;
         }
 
         if (addModal) {
-          addModal.hide(); // je ferme la fenetre
+          addModal.hide();
         }
-        // je recharge les points depuis la base
+
+        // je remets les flags a zero
+        editMode = false;
+        currentEditId = null;
+
         loadMarkers();
       })
-
       .catch(function(err) {
-        console.error("Erreur lors de l ajout :", err);
-        alert("Erreur lors de l'ajout du restaurant.");
+        console.error("Erreur save:", err);
+        alert("Erreur lors de l'enregistrement du restaurant.");
       });
   });
 }

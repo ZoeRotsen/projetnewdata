@@ -1,6 +1,14 @@
 import express from "express";
 
-import { getData, getAvgScoreCuisine, insertRestaurant} from "./db.js";
+import {
+  getData,
+  getAvgScoreCuisine,
+  insertRestaurant,
+  getDataById,
+  updateRestaurant,
+  deleteRestaurantById
+} from "./db.js";
+
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -60,58 +68,66 @@ app.get("/api/items/avg/cuisine", async (req, res) => {
   }
 });
 
+
 // Route API pour renvoyer un point spécifique
 app.get("/api/items/:id", async (req, res) => {
   try {
     const id = req.params.id;
-    (!id)
-    const data = await getData(id);
+
+    const data = await getDataById(id);
+
+    if (!data) {
+      return res.status(404).json({ error: "Restaurant non trouvé" });
+    }
+
     res.json(data);
   } catch (err) {
     console.error(err);
-    res.status(500).json({error:"Erreur lors de la récupération des données"});
+    res.status(500).json({ error: "Erreur lors de la récupération des données" });
   }
 });
 
 
-// Route API pour ajouter un point
-app.post("/api/items", async (req,res) => {
-  try {
-    var response = await postData(req.body);
-    res.json(response);
-  }catch (err) {
-    console.error(err);
-    res.status(500).json({error:"Erreur lors de l'écriture des données"});
-  }
-});
-
-// Route API pour modifier un point
+// Route API pour modifier un restaurant
 app.put("/api/items/:id", async (req, res) => {
   try {
     const id = req.params.id;
-    (!req.body && !id)
-    console.log("Body reçu du formulaire :", req.body);
-    const response = await postDataForm(req.body);
-    console.log("Response de la base :", response)
-    res.redirect("/");
-  }catch (err) {
+    const doc = req.body;
+
+    console.log("Update reçu pour id :", id, "doc:", doc);
+
+    const result = await updateRestaurant(id, doc);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json(result);
+  } catch (err) {
     console.error(err);
-    res.status(500).json({error:"Erreur lors de l'écriture des données"});
+    res.status(500).json({ error: "Erreur lors de la modification du restaurant" });
   }
 });
 
-// Route API pour renvoyer un point spécifique
+
+// Route API pour supprimer un restaurant
 app.delete("/api/items/:id", async (req, res) => {
   try {
     const id = req.params.id;
-    (!id)
-    const data = await deleteById(id);
-    res.json(data);
+
+    const result = await deleteRestaurantById(id);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json(result);
   } catch (err) {
     console.error(err);
-    res.status(500).json({error:"Erreur lors de la récupération des données"});
+    res.status(500).json({ error: "Erreur lors de la suppression du restaurant" });
   }
 });
+
 
 // Lancement du serveur
 const PORT = 3000;
