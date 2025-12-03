@@ -686,8 +686,7 @@ if (addOpenBtn && addModal) {
 // je coupe le mode ajout quand on ferme le modal
 if (addModalElement) {
   addModalElement.addEventListener("hidden.bs.modal", function() {
-    // je ne touche pas a addMode
-    // j enleve juste le marker si on annule tout
+    // je ne touche pas a addMode. J enleve juste le marker si on annule tout
     if (!addMode && addTempMarker) {
       map.removeLayer(addTempMarker);
       addTempMarker = null;
