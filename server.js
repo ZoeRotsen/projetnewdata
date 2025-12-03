@@ -1,6 +1,6 @@
 import express from "express";
 
-import { getData, getAvgScoreCuisine } from "./db.js";
+import { getData, getAvgScoreCuisine, insertRestaurant} from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -26,6 +26,28 @@ app.get("/api/items", async (req, res) => {
     res.status(500).json({ error: "Erreur lors de la récupération des données" });
   }
 });
+
+
+// Route API pour ajouter un restaurant
+app.post("/api/items", async (req, res) => {
+  try {
+    console.log("Body reçu du formulaire :", req.body); // je regarde ce qui arrive
+
+    const result = await insertRestaurant(req.body);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    // je renvoie le resultat de l insert
+    res.status(201).json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de l'ajout du restaurant" });
+  }
+});
+
+
 
 // Route API pour renvoyer la moyenne par cuisine
 app.get("/api/items/avg/cuisine", async (req, res) => {

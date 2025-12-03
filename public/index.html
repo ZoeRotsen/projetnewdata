@@ -1,41 +1,108 @@
 <!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="UTF-8">
-    <title>Carte MongoDB + Leaflet</title>
+<head>
+  <meta charset="UTF-8">
+  <title>Carte MongoDB + Leaflet</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
-    <style>
-      
+  <!-- CSS pour les clusters Leaflet -->
+  <link rel="stylesheet"
+     href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <!-- JS du plugin de clustering -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+
+  <style>
+    
+    #map {
+      height: calc(100vh - 80px);
+      width: 100%;
+      margin-top: 80px;
+    }
+
+    #stats-panel {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      z-index: 1000;
+      width: 300px;
+    }
+
+    #stats-content {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    #filters-panel {
+      position: fixed;
+      top: 360px;       /* en dessous du panneau stats */
+      left: 20px;
+      z-index: 1000;
+      width: 300px;
+    }
+
+    @media (max-width: 768px) {
+      #stats-panel,
+      #filters-panel {
+          position: static;
+          width: auto;
+          margin: 0 1rem 1rem 1rem;
+      }
+
       #map {
-          height: calc(100vh - 80px);
-          width: 100%;
-          margin-top: 80px;
+          margin-top: 0;
+          height: 60vh;
+      }
+    }
+          /* petit rond de couleur dans la legende */
+      .legend-color-box {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid #333;
       }
 
-      #stats-panel {
-          position: fixed;
-          top: 80px;
-          left: 20px;
-          z-index: 1000;
-          width: 300px;
+      .legend-green {
+        background-color: #198754; /* vert */
       }
 
-      #stats-content {
-          max-height: 250px;
-          overflow-y: auto;
+      .legend-orange {
+        background-color: #fd7e14; /* orange */
       }
-    </style>
-  </head>
 
-  <body>
+      .legend-red {
+        background-color: #dc3545; /* rouge */
+      }
 
-    <h2 class="m-3">Carte des restaurants</h2>
+      #legend-panel {
+        position: fixed;
+        top: 360px;       /* en dessous de tes panneaux à gauche ou à droite, adapte au besoin */
+        right: 20px;
+        z-index: 1000;
+        width: 260px;
+      }
+
+      @media (max-width: 768px) {
+        #legend-panel {
+          position: static;
+          width: auto;
+          margin: 0 1rem 1rem 1rem;
+        }
+      }
+
+  </style>
+</head>
+
+<body>
+
+  <h2 class="m-3">Carte des restaurants</h2>
 
   <div id="stats-panel" class="card shadow p-3">
     <label for="stats-select" class="form-label fw-bold">Statistiques</label>
@@ -56,9 +123,163 @@
 
     <canvas id="stats-chart" style="display: none;"></canvas>
   </div>
+  <div id="filters-panel" class="card shadow p-3 mt-3">
+    <h5 class="card-title">Filtres</h5>
+
+    <div class="mb-2">
+      <label for="filter-cuisine" class="form-label">Cuisine</label>
+      <select id="filter-cuisine" class="form-select form-select-sm">
+        <option value="">Toutes</option>
+      </select>
+    </div>
+
+    <div class="mb-2">
+      <label for="filter-borough" class="form-label">Quartier</label>
+      <select id="filter-borough" class="form-select form-select-sm">
+        <option value="">Tous</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="filter-min-score" class="form-label">Score minimum</label>
+      <input id="filter-min-score" type="number"
+              class="form-control form-control-sm"
+              min="0" step="1" placeholder="ex: 10">
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <button id="filter-apply" class="btn btn-primary btn-sm">Appliquer</button>
+      <button id="filter-reset" class="btn btn-outline-secondary btn-sm">Réinitialiser</button>
+    </div>
+    <hr class="my-2">
+
+      <button id="add-open" class="btn btn-success btn-sm w-100">
+        Ajouter un restaurant
+      </button>
+  </div>
+
+  <!-- Ajout de la légende -->
+  <div id="legend-panel" class="card shadow p-3">
+  <h6 class="card-title mb-2">Légende des scores</h6>
+
+  <div class="d-flex align-items-center mb-1">
+    <span class="legend-color-box legend-green me-2"></span>
+    <span class="small">Score &lt; 10 : bon</span>
+  </div>
+
+  <div class="d-flex align-items-center mb-1">
+    <span class="legend-color-box legend-orange me-2"></span>
+    <span class="small">10 ≤ score &lt; 20 : moyen</span>
+  </div>
+
+  <div class="d-flex align-items-center">
+    <span class="legend-color-box legend-red me-2"></span>
+    <span class="small">Score ≥ 20 : à surveiller</span>
+  </div>
+</div>
 
 
   <div id="map"></div>
+
+  <!-- Formulaire pour ajouter un restaurant -->
+  <div class="modal fade" id="add-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="add-form">
+          <div class="modal-header">
+            <h5 class="modal-title">Ajouter un restaurant</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+
+          <div class="modal-body">
+
+            <!-- NOM -->
+            <div class="mb-2">
+              <label for="add-name" class="form-label">Nom</label>
+              <input type="text" id="add-name" class="form-control form-control-sm" required>
+            </div>
+
+            <!-- CUISINE -->
+            <div class="mb-2">
+              <label for="add-cuisine" class="form-label">Cuisine</label>
+              <input type="text" id="add-cuisine" class="form-control form-control-sm" required>
+            </div>
+
+            <!-- QUARTIER -->
+            <div class="mb-2">
+              <label for="add-borough" class="form-label">Quartier</label>
+              <input type="text" id="add-borough" class="form-control form-control-sm" required>
+            </div>
+
+            <hr class="my-2">
+
+            <!-- ADRESSE -->
+            <div class="mb-2">
+              <label for="add-building" class="form-label">Numéro de bâtiment</label>
+              <input type="text" id="add-building" class="form-control form-control-sm">
+            </div>
+
+            <div class="mb-2">
+              <label for="add-street" class="form-label">Rue</label>
+              <input type="text" id="add-street" class="form-control form-control-sm">
+            </div>
+
+            <div class="mb-2">
+              <label for="add-zipcode" class="form-label">Code postal</label>
+              <input type="text" id="add-zipcode" class="form-control form-control-sm">
+            </div>
+
+            <hr class="my-2">
+
+            <!-- COORDONNÉES (choisies en cliquant la carte) -->
+            <div class="mb-2">
+              <label for="add-lat" class="form-label">Latitude</label>
+              <input id="add-lat" type="text" class="form-control form-control-sm" readonly>
+            </div>
+
+            <div class="mb-2">
+              <label for="add-lng" class="form-label">Longitude</label>
+              <input id="add-lng" type="text" class="form-control form-control-sm" readonly>
+              <div class="form-text">
+                Clique sur le bouton puis sur la carte.
+              </div>
+              <button type="button" id="add-pick-map" class="btn btn-outline-primary btn-sm mt-2">
+                Choisir sur la carte
+              </button>
+            </div>
+
+            <hr>
+
+            <!-- NOTE (une seule note simple) -->
+            <div class="mb-2">
+              <label for="add-grade" class="form-label">Grade (A/B/C…)</label>
+              <input id="add-grade" type="text" maxlength="1" class="form-control form-control-sm">
+            </div>
+
+            <div class="mb-2">
+              <label for="add-score" class="form-label">Score</label>
+              <input id="add-score" type="number" min="0" class="form-control form-control-sm">
+            </div>
+
+            <hr>
+
+            <!-- RESTAURANT ID (optionnel) -->
+            <div class="mb-2">
+              <label for="add-rest-id" class="form-label">Restaurant ID (optionnel)</label>
+              <input id="add-rest-id" type="text" class="form-control form-control-sm">
+            </div>
+
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annuler</button>
+            <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
