@@ -5,16 +5,18 @@ const client = new MongoClient(uri);
 // Récupère la collection dans la base MongoDB
 async function getCollection(){
   await client.connect();
-  const db = client.db('first-bd');
+  const db= client.db('first-bd');
   const collection = db.collection('restaurants');
   return collection;
 }
 
+//Récupérer toutes les données de la base
 export async function getData() {
-  var collection = await getCollection();
+  var collection=await getCollection();
   return await collection.find().toArray();
 }
 
+//récupérer un élément particulier de la base
 export async function getDataById(id) {
   let collection = await getCollection();
 
@@ -32,25 +34,55 @@ export async function getDataById(id) {
 }
 
 
+
 export async function getAvgScoreCuisine() {
+  const collection=await getCollection();
+  const pipeline=[
+    {
+      $addFields:{
+        firstScore:{$arrayElemAt:["$grades.score",0]}
+      }
+    },
+    {
+      $group:{
+        _id:"$cuisine",
+        scoreMoyen:{$avg:"$firstScore"}
+      }
+    },
+    {$sort:{scoreMoyen:-1}}
+  ];
+
+  const result=await collection.aggregate(pipeline).toArray();
+  return result;
+}
+
+//Récupérer la distribution des scores des cuisines
+export async function getDistributionScoresByCuisine() {
   const collection = await getCollection();
   const pipeline = [
     {
-      $addFields: {
-        firstScore: { $arrayElemAt: ["$grades.score", 0] }
+      $addFields:{
+        firstScore:{$arrayElemAt:["$grades.score",0]}
       }
     },
     {
-      $group: {
-        _id: "$cuisine",
-        scoreMoyen: { $avg: "$firstScore" }
+      $match:{firstScore:{$ne:null}}
+    },
+    {
+      $group:{
+        _id:"$cuisine",
+        scores:{$push: "$firstScore"},
+        min:{$min:"$firstScore"},
+        max:{$max:"$firstScore"},
+        count:{$sum:1}
       }
     },
-    { $sort: { scoreMoyen: -1 } }
+    {
+      $project:{_id:0,cuisine:"$_id",scores:1,min:1,max:1,count:1}
+    },
+    {$sort:{cuisine:1}}
   ];
-
-  const result = await collection.aggregate(pipeline).toArray();
-  return result;
+  return await collection.aggregate(pipeline).toArray();
 }
 
 // ici je supprime un resto avec son id
@@ -194,37 +226,3 @@ export async function updateRestaurant(id, doc) {
 
   return { ok: true };
 }
-
-
-/*export async function postData(p){
-  var collection = await getCollection();
-  return await collection.insertMany(p);
-}
-
-export async function postDataForm(r){
-  var collection = await getCollection();
-
-  const {
-    name,
-    cuisine,
-    pollution,
-    lng,
-    lat
-  } = r;
-
-  if (!name || !cuisine || !pollution || !lng || !lat) {
-    return "Champs manquants.";
-  }
-
-  const doc = {
-    name: name,
-    cuisine: cuisine,
-    pollution: pollution,
-    location: {
-      type: "Point",
-      coordinates: [lng,lat]
-    }
-  };
-
-  return await collection.insertOne(doc);
-}*/
