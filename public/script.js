@@ -265,12 +265,12 @@ function drawMarkers(points) {
       marker.bindPopup(
         "<div class='fw-bold'>" + name + "</div>" + "<br>"+
         "<div class='small text-muted mb-1'>" +
-        "<b>Cuisine: </b>"+cuisine + "<br>"+
+        "<b>Cuisine: </b>"+ cuisine + "<br>"+
         "<b>Quartier: </b>" + borough +
         "</div>" +
-        "<div>Score moyen : <span class='fw-bold'>" + scoreText + "</span></div>" +
-        "<div class='popup-edit-container'>" +
-          "<img src='/icons/edit.png' class='edit-icon' title='Modifier ce restaurant'>" +
+        "<div class='d-flex justify-content-between align-items-end mt-2'>"+
+          "<button class='btn btn-info btn-sm popup-near-btn mt-1'> Restaurants proches</button>"+
+          "<img src='/icons/edit.png' class='edit-icon' title='Modifier restaurant' style='width:20px;height:20px;'>"+
         "</div>"
 
       );
