@@ -39,13 +39,13 @@ export async function getDataById(id) {
 }
 
 
-
+//récupérer la moyenne des scores par cuisine
 export async function getAvgScoreCuisine() {
   const collection=await getCollection();
   const pipeline=[
     {
       $addFields:{
-        firstScore:{$arrayElemAt:["$grades.score",0]}
+        firstScore:{$arrayElemAt:["$grades.score",0]}//On rcupère seulement le premier score
       }
     },
     {
@@ -67,7 +67,7 @@ export async function getDistributionScoresByCuisine() {
   const pipeline = [
     {
       $addFields:{
-        firstScore:{$arrayElemAt:["$grades.score",0]}
+        firstScore:{$arrayElemAt:["$grades.score",0]}//On rcupère seulement le premier score
       }
     },
     {
@@ -234,9 +234,8 @@ export async function updateRestaurant(id, doc) {
 
 //Récupérer les restaurants les plus proches du point sélectionné
 export async function getNearItems(lng,lat,maxDistanceMeters) {
-  const collection = await getCollection();
-
-  const pipeline = [
+  const collection=await getCollection();
+  const pipeline=[
     {
       $geoNear: {
         near: { type: "Point", coordinates: [lng, lat] },
@@ -246,9 +245,44 @@ export async function getNearItems(lng,lat,maxDistanceMeters) {
       }
     },
     {
-      $project: {_id: 1,name:1,cuisine:1,borough:1,address:1,dist:1}
+      $project:{_id: 1,name:1,cuisine:1,borough:1,address:1,dist:1}
     },
     { $limit: 25 }
+  ];
+
+  return collection.aggregate(pipeline).toArray();
+}
+
+
+//Récupérer le meilleur restaurant par cuisine
+export async function getBestRestau(lng,lat,maxDistanceMeters) {
+  const collection = await getCollection();
+  const pipeline = [
+    {
+      $addFields:{
+        firstScore: { $arrayElemAt: ["$grades.score", 0] }
+      }
+    },
+    {
+      $sort:{cuisine:1}
+    },
+    {
+      $group:{
+        _id: "$cuisine",
+        bestRestau: {
+          $first: {
+            _id: "$_id",
+            name: "$name",
+            cuisine: "$cuisine",
+            score: "$firstScore",
+            coordinates: "$address.coord.coordinates"
+          }
+        }
+      }
+    },
+    {
+      $project:{cuisine:"$_id",bestRestau: 1,_id:0}
+    }
   ];
 
   return collection.aggregate(pipeline).toArray();

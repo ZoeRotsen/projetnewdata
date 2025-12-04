@@ -7,7 +7,8 @@ import {
   getDataById,
   updateRestaurant,
   deleteRestaurantById,
-  getNearItems
+  getNearItems,
+  getBestRestau
 } from "./db.js";
 
 import path from "path";
@@ -87,9 +88,9 @@ app.get("/api/items/:id", async (req, res) => {
   try {
     const id = req.params.id;
 
-    const data= await getDataById(id);
+    const data = await getDataById(id);
 
-    if (!data) {
+    if(!data){
       return res.status(404).json({ error: "Restaurant non trouvé" });
     }
 
@@ -105,9 +106,9 @@ app.get("/api/items/:id", async (req, res) => {
 app.get("/api/itemsNear", async (req, res) => {
   try {
     
-    const lng = parseFloat(req.query.lng);
-    const lat = parseFloat(req.query.lat);
-    const dist = parseInt(req.query.dist);
+    const lng=parseFloat(req.query.lng);
+    const lat=parseFloat(req.query.lat);
+    const dist=parseInt(req.query.dist);
 
     if(isNaN(lng) || isNaN(lat) || isNaN(dist)) {
       return res.status(400).json({ error: "Coordonnées invalides" });
@@ -115,17 +116,32 @@ app.get("/api/itemsNear", async (req, res) => {
 
     const data=await getNearItems(lng,lat,dist)
 
-    if (!data) {
+    if(!data){
       return [];
     }
     
     res.json(data)
-  } catch (err) {
+  }catch(err) {
     console.error(err);
     res.status(500).json({ error: "Erreur lors de la récupération des données" });
   }
 });
 
+
+
+// Route API pour renvoyer les meilleurs restaurants par cuisine
+app.get("/api/itemsBestRestau", async (req, res) => {
+  try {
+    const data=await getBestRestau();
+    if(!data){
+      return [];
+    } 
+    res.json(data)
+  }catch(err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la récupération des données" });
+  }
+});
 
 
 // Route API pour modifier un restaurant

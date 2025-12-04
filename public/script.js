@@ -11,9 +11,11 @@ let clusterGroup = null;  // groupe de clusters
 let editMode = false;  // je dis si je suis en mode edit
 let currentEditId = null;  // je garde l id du resto que je modifie
 
+//longitute et latitude pour la recherche des points les plus proches
 var lngForNear =null;
 var latForNear=null;
-var distanceCircle = null;
+var distanceCircle = null; //variable pour le rayon des point des points les plus proches
+var chartInstance=null; //variable pour les graphiques
 
 // je calcule le score moyen d un resto
 function getAverageScore(point) {
@@ -348,18 +350,17 @@ function buildFilterOptions(points) {
 }
 
 
-
-//variable pour les graphiques
-var chartInstance=null;
-
 //Récupération des stats
 function loadStats(type) {
   var content=document.getElementById("stats-content");
   var canvas=document.getElementById("stats-chart");
   var displayMode=document.getElementById("display-mode").value;
+  var chartOption = document.getElementById("display-mode").querySelector('option[value="chart"]');
 
   //Affichage des moyennes des scores de chaque cuisine
   if (type=="AvgScoreCuisine") {
+    //Affichage de l'option graphique
+    chartOption.style.display = "block";
     fetch(`${baseUrl}/items/avg/cuisine`)
       .then(r => r.json())
       .then(data => {
@@ -403,12 +404,15 @@ function loadStats(type) {
           modal.show();
         }
       });
+  //Affichage de la distribution des cuisines
   }else if(type=="DistScoreCuisine") {
+    //Affichage de l'option graphique
+    chartOption.style.display = "block";
     fetch(`${baseUrl}/items/dist/cuisine`)
       .then(r => r.json())
       .then(data => {
 
-        //Récupération des données ous forme de tableau
+        //Récupération des données
         var dataArray=data.map(c => {      
           return {
             cuisine:c.cuisine,
@@ -417,12 +421,12 @@ function loadStats(type) {
             max:c.max
           };
         });
-
+        //Affichage des résultats en mode texte
         if (displayMode=="text") {
           content.style.display="block";
           canvas.style.display="none";
           content.innerHTML=showDistCuisine(dataArray);
-
+        //Affichage des résultats en mode graphique
         }else if(displayMode=="chart") {
           content.style.display="none";
           canvas.style.display="none";
@@ -452,13 +456,29 @@ function loadStats(type) {
           modal.show();
         }
       });
+  }else if(type=="BestRestau") {
+    //Pas d'option graphique pour cette stat
+    chartOption.style.display = "none";
+    fetch(`${baseUrl}/itemsBestRestau`)
+      .then(r => r.json())
+      .then(data => {
+        content.style.display = "block";
+        content.innerHTML = showBestRestaurants(data);
+        //Zoom auto sur le premier restau de la liste
+        if (data.length > 0) {
+          const r = bestList[0].bestRestau;
+          const [lng, lat] = r.coordinates;
+          map.setView([lat, lng], 16);
+        } 
+      });
+  //Si rien n'est sélectionné on n'affiche rien
   }else{
     content.style.display="none";
     canvas.style.display="none";
   }
 }
 
-//Afficher l'HTML pour la moyenne des cuisines
+//Afficher l'html pour la moyenne des cuisines
 function showAvgCuisine(data) {
   let html=`<div id="statsResults"><h5>Score moyen par cuisine</h5>`;
   data.forEach(avgCuisine => {
@@ -500,9 +520,9 @@ function showNearRestaurants(nearPoints) {
     html+="<div class='text-muted'>Aucun restaurant trouvé dans ce rayon.</div>";
   } else{
     nearPoints.forEach(p => {
-      var name = p.name;
-      var cuisine = p.cuisine;
-      var dist = (p.dist.calculated/1000).toFixed(2)+" km";
+      var name=p.name;
+      var cuisine=p.cuisine;
+      var dist=(p.dist.calculated/1000).toFixed(2)+" km";
       html+=`
         <div class="restaurant-item mb-2 p-2 border rounded"
              data-id="${p._id}"
@@ -517,9 +537,38 @@ function showNearRestaurants(nearPoints) {
   html+=`</div>`;
   return html;
 }
+//Afficher l'html pour le meilleur restaurant par cuisine
+function showBestRestaurants(bestRestaurants) {
+  var html=`<div id="statsResults"><h5>Meilleurs restaurants par cuisine</h5>`;
+
+  if(!bestRestaurants.length){
+    html+="<div class='text-muted'>Aucun résultat.</div>";
+  }else{
+    bestRestaurants.forEach(item => {
+      if(item.bestRestau.score){//On filtre sur les score pas défini
+        const restau=item.bestRestau;
+        html+=`
+          <div class="restaurant-item mb-2 p-2 border rounded"
+              data-id="${item.bestRestau._id}"
+              data-lng="${item.bestRestau.coordinates[0]}"
+              data-lat="${item.bestRestau.coordinates[1]}"
+              style="cursor:pointer;">
+            <div class="fw-bold">${item.bestRestau.name}</div>
+            <div class="text-muted small"><b>Cuisine : </b>${item.cuisine}</div>
+            <div class="small">Score : <b>${item.bestRestau.score}</b></div>
+          </div>`;
+        }
+      });
+    html+=`<button id="best-cancel" class="btn btn-danger mt-3" onclick="removeStats()">Annuler</button>`;
+  }
+
+  html+=`</div>`;
+  return html;
+}
 
 //On retire le texte des stats et les ajouts liés à la recherche des points lesplus proches
 function removeStats(){
+    //On efface le cercle
     if(distanceCircle){
       map.removeLayer(distanceCircle);
       distanceCircle = null;
@@ -538,7 +587,9 @@ function removeStats(){
       statsTxt.remove();
     }
     statsContent.style.display="none";
-
+    //Valeur du type d'affichage sur texte
+    document.getElementById("display-mode").value="text";
+    //On redessine les markers
     drawMarkers(allPoints);
 
 }
@@ -695,7 +746,7 @@ function drawDistanceCircle(lng,lat,dist) {
   }).addTo(map);
 }
 
-
+//Mettres les points les plus proches trouvés en bleu
 function colorNearPoints(nearPoints) {
   clearMarkers();
   drawMarkers(allPoints)
@@ -768,32 +819,32 @@ document.getElementById("near-range").addEventListener("input", e => {
 
 //Ecouteur sur le bouton Recherche des points à proximité
 document.getElementById("near-launch").addEventListener("click", async () => {
-  var distance = document.getElementById("near-range").value;
+  var distance=document.getElementById("near-range").value;
 
-  var urlNear = `${baseUrl}/itemsNear?lng=${encodeURIComponent(lngForNear)}&lat=${encodeURIComponent(latForNear)}&dist=${encodeURIComponent(distance)}`;
+  var urlNear=`${baseUrl}/itemsNear?lng=${encodeURIComponent(lngForNear)}&lat=${encodeURIComponent(latForNear)}&dist=${encodeURIComponent(distance)}`;
   console.log(urlNear);
 
-  var points = await fetch(urlNear).then(r => r.json());
+  var points=await fetch(urlNear).then(r => r.json());
 
   colorNearPoints(points);
   drawDistanceCircle(lngForNear, latForNear, distance);
 
   // On zoom sur le premier point trouvé
-  if (points.length > 0) {
-    const coords = points[0].address.coord.coordinates;
+  if (points.length>0) {
+    const coords=points[0].address.coord.coordinates;
     map.setView([coords[1], coords[0]], 18);
   }
 
-  var nearModalEl = document.getElementById("near-modal");
-  var nearModal = bootstrap.Modal.getInstance(nearModalEl) || new bootstrap.Modal(nearModalEl);
+  var nearModalEl=document.getElementById("near-modal");
+  var nearModal=bootstrap.Modal.getInstance(nearModalEl) || new bootstrap.Modal(nearModalEl);
   nearModal.hide();
 
-  var content = document.getElementById("stats-content");
+  var content=document.getElementById("stats-content");
   content.style.display = "block";
   content.innerHTML = showNearRestaurants(points);
 });
 
-// Écouteur sur les restaurants proches trouvés
+// Écouteur sur les restaurants proches trouvés et fonctionne aussi pour le meilleur restau par cuisine
 document.getElementById("stats-content").addEventListener("click", function(e) {
   let item = e.target.closest(".restaurant-item");
   if (!item) return;
@@ -813,6 +864,7 @@ document.getElementById("stats-content").addEventListener("click", function(e) {
     });
   }
 });
+
 
 // je récupère les éléments du formulaire
 let addOpenBtn = document.getElementById("add-open");
