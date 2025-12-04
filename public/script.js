@@ -11,6 +11,11 @@ let clusterGroup = null;  // groupe de clusters
 let editMode = false;  // je dis si je suis en mode edit
 let currentEditId = null;  // je garde l id du resto que je modifie
 
+//longitute et latitude pour la recherche des points les plus proches
+var lngForNear =null;
+var latForNear=null;
+var distanceCircle = null; //variable pour le rayon des point des points les plus proches
+var chartInstance=null; //variable pour les graphiques
 
 // je calcule le score moyen d un resto
 function getAverageScore(point) {
@@ -137,6 +142,21 @@ function initMap() {
         openEditForm(doc, docId);
       });
     }
+
+    var nearBtn = popupEl.querySelector(".popup-near-btn");
+    if (nearBtn) {
+        nearBtn.addEventListener("click", function () {
+          let coords = doc.address.coord.coordinates;
+          if (!coords) return;
+
+          lngForNear = coords[0];
+          latForNear = coords[1];
+
+          var nearModal = new bootstrap.Modal(document.getElementById("near-modal"));
+          nearModal.show();
+
+      });
+    }
   });
 
   // je regarde les clics sur la carte
@@ -243,9 +263,10 @@ function drawMarkers(points) {
 
       marker.restaurantDoc = point; // ici je garde le resto
       marker.bindPopup(
-        "<div class='fw-bold'>" + name + "</div>" +
+        "<div class='fw-bold'>" + name + "</div>" + "<br>"+
         "<div class='small text-muted mb-1'>" +
-          cuisine + " · " + borough +
+        "<b>Cuisine: </b>"+cuisine + "<br>"+
+        "<b>Quartier: </b>" + borough +
         "</div>" +
         "<div>Score moyen : <span class='fw-bold'>" + scoreText + "</span></div>" +
         "<div class='popup-edit-container'>" +
@@ -328,18 +349,17 @@ function buildFilterOptions(points) {
 }
 
 
-
-//variable pour les graphiques
-var chartInstance=null;
-
 //Récupération des stats
 function loadStats(type) {
   var content=document.getElementById("stats-content");
   var canvas=document.getElementById("stats-chart");
   var displayMode=document.getElementById("display-mode").value;
+  var chartOption = document.getElementById("display-mode").querySelector('option[value="chart"]');
 
   //Affichage des moyennes des scores de chaque cuisine
   if (type=="AvgScoreCuisine") {
+    //Affichage de l'option graphique
+    chartOption.style.display = "block";
     fetch(`${baseUrl}/items/avg/cuisine`)
       .then(r => r.json())
       .then(data => {
@@ -383,12 +403,15 @@ function loadStats(type) {
           modal.show();
         }
       });
+  //Affichage de la distribution des cuisines
   }else if(type=="DistScoreCuisine") {
+    //Affichage de l'option graphique
+    chartOption.style.display = "block";
     fetch(`${baseUrl}/items/dist/cuisine`)
       .then(r => r.json())
       .then(data => {
 
-        //Récupération des données ous forme de tableau
+        //Récupération des données
         var dataArray=data.map(c => {      
           return {
             cuisine:c.cuisine,
@@ -397,15 +420,15 @@ function loadStats(type) {
             max:c.max
           };
         });
-
+        //Affichage des résultats en mode texte
         if (displayMode=="text") {
           content.style.display="block";
           canvas.style.display="none";
           content.innerHTML=showDistCuisine(dataArray);
-
+        //Affichage des résultats en mode graphique
         }else if(displayMode=="chart") {
           content.style.display="none";
-          canvas.style.display="none"; // on cache le canvas du panneau
+          canvas.style.display="none";
           var modalCanvas=document.getElementById("modal-chart");
 
           var labels=dataArray.map(c => c.cuisine);
@@ -432,15 +455,31 @@ function loadStats(type) {
           modal.show();
         }
       });
+  }else if(type=="BestRestau") {
+    //Pas d'option graphique pour cette stat
+    chartOption.style.display = "none";
+    fetch(`${baseUrl}/itemsBestRestau`)
+      .then(r => r.json())
+      .then(data => {
+        content.style.display = "block";
+        content.innerHTML = showBestRestaurants(data);
+        //Zoom auto sur le premier restau de la liste
+        if (data.length > 0) {
+          const r = bestList[0].bestRestau;
+          const [lng, lat] = r.coordinates;
+          map.setView([lat, lng], 16);
+        } 
+      });
+  //Si rien n'est sélectionné on n'affiche rien
   }else{
     content.style.display="none";
     canvas.style.display="none";
   }
 }
 
-//Rendu de l'HTML pour la moyenne des cuisines
+//Afficher l'html pour la moyenne des cuisines
 function showAvgCuisine(data) {
-  let html="<h5>Score moyen par cuisine</h5>";
+  let html=`<div id="statsResults"><h5>Score moyen par cuisine</h5>`;
   data.forEach(avgCuisine => {
     html+= `
       <div class="cuisine-item">
@@ -449,11 +488,14 @@ function showAvgCuisine(data) {
       </div>
     `;
   });
+  html+='<button id="avg-cancel" class="btn btn-danger mt-3" onclick="removeStats()">Annuler</button>';
+  html+=`</div>`;
   return html;
 }
 
+//Afficher l'html de la distribution des cuisine
 function showDistCuisine(data) {
-  let html="<h5>Distribution des scores par cuisine</h5>";
+  var html=`<div id="statsResults"><h5>Distribution des scores par cuisine</h5>`;
   data.forEach(distCuisine => {
     html+= `
       <div class="cuisine-item">
@@ -463,11 +505,94 @@ function showDistCuisine(data) {
           Min : <span class="min">${distCuisine.min}</span> | 
           Max : <span class="max">${distCuisine.max}</span>
         </div>
-      </div>
-    `;
+      </div>`;
   });
+  html+='<button id="dist-cancel" class="btn btn-danger mt-3" onclick="removeStats()">Annuler</button>';
+  html+=`</div>`;
   return html;
 }
+
+//Afficher l'html des points les plus proches dans le panneau
+function showNearRestaurants(nearPoints) {
+  var html=`<div id="statsResults"><h5>Restaurants trouvés à proximité</h5>`;
+  if (!nearPoints.length) {
+    html+="<div class='text-muted'>Aucun restaurant trouvé dans ce rayon.</div>";
+  } else{
+    nearPoints.forEach(p => {
+      var name=p.name;
+      var cuisine=p.cuisine;
+      var dist=(p.dist.calculated/1000).toFixed(2)+" km";
+      html+=`
+        <div class="restaurant-item mb-2 p-2 border rounded"
+             data-id="${p._id}"
+             style="cursor:pointer;">
+          <div class="fw-bold">${name}</div>
+          <div class="text-muted small">${cuisine}</div>
+          <div class="small">Distance : <b>${dist}</b></div>
+        </div>`;
+    });
+    html+='<button id="near-cancel" class="btn btn-danger mt-3" onclick="removeStats()">Annuler</button>';
+  }
+  html+=`</div>`;
+  return html;
+}
+//Afficher l'html pour le meilleur restaurant par cuisine
+function showBestRestaurants(bestRestaurants) {
+  var html=`<div id="statsResults"><h5>Meilleurs restaurants par cuisine</h5>`;
+
+  if(!bestRestaurants.length){
+    html+="<div class='text-muted'>Aucun résultat.</div>";
+  }else{
+    bestRestaurants.forEach(item => {
+      if(item.bestRestau.score){//On filtre sur les score pas défini
+        const restau=item.bestRestau;
+        html+=`
+          <div class="restaurant-item mb-2 p-2 border rounded"
+              data-id="${item.bestRestau._id}"
+              data-lng="${item.bestRestau.coordinates[0]}"
+              data-lat="${item.bestRestau.coordinates[1]}"
+              style="cursor:pointer;">
+            <div class="fw-bold">${item.bestRestau.name}</div>
+            <div class="text-muted small"><b>Cuisine : </b>${item.cuisine}</div>
+            <div class="small">Score : <b>${item.bestRestau.score}</b></div>
+          </div>`;
+        }
+      });
+    html+=`<button id="best-cancel" class="btn btn-danger mt-3" onclick="removeStats()">Annuler</button>`;
+  }
+
+  html+=`</div>`;
+  return html;
+}
+
+//On retire le texte des stats et les ajouts liés à la recherche des points lesplus proches
+function removeStats(){
+    //On efface le cercle
+    if(distanceCircle){
+      map.removeLayer(distanceCircle);
+      distanceCircle = null;
+    }
+    markers.forEach(marker => {
+      var point=marker.restaurantDoc;
+      if (!point) return;
+
+      var style=styleMap(point);
+      marker.setStyle(style);
+    });
+
+    var statsTxt=document.getElementById("statsresults");
+    var statsContent=document.getElementById("stats-content");
+    if(statsTxt){
+      statsTxt.remove();
+    }
+    statsContent.style.display="none";
+    //Valeur du type d'affichage sur texte
+    document.getElementById("display-mode").value="text";
+    //On redessine les markers
+    drawMarkers(allPoints);
+
+}
+
 
 
 // ici je remplis le formulaire pour modifier un resto
@@ -605,11 +730,63 @@ function resetFilters() {
   drawMarkers(allPoints); // je remets tous les points
 }
 
+//Dessiner le rayon de recherche pour les points les lus proches
+function drawDistanceCircle(lng,lat,dist) {
+  //Suppression de l'ancien cercle
+  if (distanceCircle) {
+    map.removeLayer(distanceCircle);
+  }
+
+  distanceCircle = L.circle([lat, lng], {
+    radius: dist,
+    color: "#0d6efd",
+    fillOpacity: 0.2,
+    weight: 1,
+  }).addTo(map);
+}
+
+//Mettres les points les plus proches trouvés en bleu
+function colorNearPoints(nearPoints) {
+  clearMarkers();
+  drawMarkers(allPoints)
+  var nearSet = new Set(nearPoints.map(p => p._id));
+
+  markers.forEach(marker => {
+    var point = marker.restaurantDoc;
+    if (!point || !point.address?.coord?.coordinates) return;
+
+    var style = styleMap(point);
+
+    if (nearSet.has(point._id)) {
+  
+      style.color = "#0d6efd";
+      style.fillColor = "#0d6efd";
+      style.radius += 3;
+      style.weight = 2;
+    }
+
+    marker.setStyle(style);
+  });
+}
 
 
-//Initialisation des fonctions
+//Initialisation des fonctions et mise en place des écouteurs
 initMap();
 
+//Ouverture du panneau stats
+document.getElementById("stats-open-btn").addEventListener("click", () => {
+  document.getElementById("stats-panel").style.display = "block";
+  document.getElementById("stats-open-btn").style.display = "none";
+});
+
+//Fermerture du panneau stats
+document.getElementById("stats-close-btn").addEventListener("click", () => {
+  document.getElementById("stats-panel").style.display = "none";
+  document.getElementById("stats-open-btn").style.display = "block";
+});
+
+
+//Ecouteur sur le select des stats
 document.getElementById("stats-select").addEventListener("change", e => loadStats(e.target.value));
 
 // je branche le bouton appliquer
@@ -628,11 +805,65 @@ if (filterResetBtn) {
   });
 }
 
-
+//Ecouteur sur le select du mode d'affichage
 document.getElementById("display-mode").addEventListener("change", () => {
   const selectedStat=document.getElementById("stats-select").value;
   loadStats(selectedStat);
 });
+
+//Ecouteur sur la slide pour sélectionner la distance
+document.getElementById("near-range").addEventListener("input", e => {
+  document.getElementById("near-range-value").textContent = e.target.value;
+});
+
+//Ecouteur sur le bouton Recherche des points à proximité
+document.getElementById("near-launch").addEventListener("click", async () => {
+  var distance=document.getElementById("near-range").value;
+
+  var urlNear=`${baseUrl}/itemsNear?lng=${encodeURIComponent(lngForNear)}&lat=${encodeURIComponent(latForNear)}&dist=${encodeURIComponent(distance)}`;
+  console.log(urlNear);
+
+  var points=await fetch(urlNear).then(r => r.json());
+
+  colorNearPoints(points);
+  drawDistanceCircle(lngForNear, latForNear, distance);
+
+  // On zoom sur le premier point trouvé
+  if (points.length>0) {
+    const coords=points[0].address.coord.coordinates;
+    map.setView([coords[1], coords[0]], 18);
+  }
+
+  var nearModalEl=document.getElementById("near-modal");
+  var nearModal=bootstrap.Modal.getInstance(nearModalEl) || new bootstrap.Modal(nearModalEl);
+  nearModal.hide();
+
+  var content=document.getElementById("stats-content");
+  content.style.display = "block";
+  content.innerHTML = showNearRestaurants(points);
+});
+
+// Écouteur sur les restaurants proches trouvés et fonctionne aussi pour le meilleur restau par cuisine
+document.getElementById("stats-content").addEventListener("click", function(e) {
+  let item = e.target.closest(".restaurant-item");
+  if (!item) return;
+
+  const id = item.getAttribute("data-id");
+
+  const marker = markers.find(m => {
+    const doc = m.restaurantDoc;
+    return doc && (doc._id == id || doc.restaurant_id == id);
+  });
+
+  if (marker) {
+    clusterGroup.zoomToShowLayer(marker, () => {
+      const pos = marker.getLatLng();
+      map.setView(pos, 18);
+      marker.openPopup();
+    });
+  }
+});
+
 
 // je récupère les éléments du formulaire
 let addOpenBtn = document.getElementById("add-open");
