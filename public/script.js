@@ -129,7 +129,7 @@ function initMap() {
       return;
     }
 
-    let editBtn = popupEl.querySelector(".popup-edit-btn");
+    let editBtn = popupEl.querySelector(".edit-icon");
     let docId = getDocId(doc);
 
     if (editBtn) {
@@ -248,9 +248,10 @@ function drawMarkers(points) {
           cuisine + " · " + borough +
         "</div>" +
         "<div>Score moyen : <span class='fw-bold'>" + scoreText + "</span></div>" +
-        "<div class='mt-2'>" +
-          "<button class='btn btn-warning btn-sm popup-edit-btn'>EDIT</button>" +
+        "<div class='popup-edit-container'>" +
+          "<img src='/icons/edit.png' class='edit-icon' title='Modifier ce restaurant'>" +
         "</div>"
+
       );
 
       clusterGroup.addLayer(marker);  // j ajoute le point dans le cluster
@@ -263,6 +264,7 @@ function drawMarkers(points) {
 
 // je charge les points depuis l api
 function loadMarkers() {
+
   fetch(baseUrl + "/items")
     .then(function(res) {
       return res.json();
@@ -274,6 +276,7 @@ function loadMarkers() {
     })
     .catch(function(err) {
       console.error("Erreur loadMarkers :", err);
+
     });
 }
 
@@ -327,64 +330,141 @@ function buildFilterOptions(points) {
 
 
 //variable pour les graphiques
-var chartInstance = null;
+var chartInstance=null;
 
 //Récupération des stats
 function loadStats(type) {
-  const content = document.getElementById("stats-content");
-  const canvas = document.getElementById("stats-chart");
-  const mode = document.getElementById("display-mode").value; // texte ou graphique
+  var content=document.getElementById("stats-content");
+  var canvas=document.getElementById("stats-chart");
+  var displayMode=document.getElementById("display-mode").value;
 
   //Affichage des moyennes des scores de chaque cuisine
-  if (type === "AvgScoreCuisine") {
+  if (type=="AvgScoreCuisine") {
     fetch(`${baseUrl}/items/avg/cuisine`)
-      .then(r=>r.json())
+      .then(r => r.json())
       .then(data => {
-        //Affichage en mode texte
-        if (mode === "text") {
-          content.style.display = "block";
-          canvas.style.display = "none";
-          content.innerHTML = showAvgCuisine(data);
-        } else if (mode === "chart") { //Affichage en mode graphique
-          content.style.display = "none";
-          canvas.style.display = "block";
+        if (displayMode=="text") {
+          // Affichage en mode texte dans le panneau
+          content.style.display="block";
+          canvas.style.display="none";
+          content.innerHTML=showAvgCuisine(data);
 
-          const labels = data.map(avgCuisine=>avgCuisine._id);
-          const scores = data.map(avgCuisine=>avgCuisine.scoreMoyen.toFixed(2));
+        } else if(displayMode=="chart") {
+          //Affichage en mode graphique dans le modal
+          content.style.display="none";
+          canvas.style.display="none"; // on cache le canvas du panneau
+          const modalCanvas=document.getElementById("modal-chart");
+
+          const labels=data.map(avgCuisine=>avgCuisine._id);
+          const scores=data.map(avgCuisine=>avgCuisine.scoreMoyen.toFixed(2));
 
           if (chartInstance) chartInstance.destroy();
 
-          chartInstance = new Chart(canvas, {
-            type: 'bar',
-            data: {
-              labels: labels,
-              datasets: [{
-                label: 'Score moyen',
-                data: scores,
-                backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
+          chartInstance=new Chart(modalCanvas, {
+            type:'bar',
+            data:{
+              labels:labels,
+              datasets:[{
+                label:'Score moyen',
+                data:scores,
+                backgroundColor:'rgba(54, 162, 235, 0.7)',
+                borderColor:'rgba(54, 162, 235, 1)',
+                borderWidth:1
               }]
             },
             options: {
-              responsive: true,
-              scales: { y: { beginAtZero: true } },
-              plugins: { legend: { display: false } }
+              responsive:true,
+              scales: {y: {beginAtZero:true}},
+              plugins: {legend: {display:false}}
             }
           });
+
+          const modal= new bootstrap.Modal(document.getElementById('chartModal'));
+          modal.show();
         }
       });
-  } else {
-    content.style.display = "none";
-    canvas.style.display = "none";
+  }else if(type=="DistScoreCuisine") {
+    fetch(`${baseUrl}/items/dist/cuisine`)
+      .then(r => r.json())
+      .then(data => {
+
+        //Récupération des données ous forme de tableau
+        var dataArray=data.map(c => {      
+          return {
+            cuisine:c.cuisine,
+            count:c.count,
+            min:c.min,
+            max:c.max
+          };
+        });
+
+        if (displayMode=="text") {
+          content.style.display="block";
+          canvas.style.display="none";
+          content.innerHTML=showDistCuisine(dataArray);
+
+        }else if(displayMode=="chart") {
+          content.style.display="none";
+          canvas.style.display="none"; // on cache le canvas du panneau
+          var modalCanvas=document.getElementById("modal-chart");
+
+          var labels=dataArray.map(c => c.cuisine);
+          var scores=dataArray.map(c => c.count);
+          var min=dataArray.map(c => c.min);
+          var max=dataArray.map(c => c.max);
+
+          if(chartInstance) chartInstance.destroy();
+
+          chartInstance=new Chart(modalCanvas, {
+            type:'bar',
+            data: {
+              labels:labels,
+              datasets: [
+                {label:'Score min',data:min,backgroundColor:'rgba(255,99,132,0.5)',borderColor:'rgba(255,99,132,1)',borderWidth:1},
+                {label:'Score max',data:max,backgroundColor:'rgba(75,192,192,0.5)',borderColor:'rgba(75,192,192,1)',borderWidth:1}
+              ]
+            },
+            options:{responsive:true,scales:{y:{beginAtZero:true}}}
+          });
+
+          // Ouvrir le modal
+          const modal=new bootstrap.Modal(document.getElementById('chartModal'));
+          modal.show();
+        }
+      });
+  }else{
+    content.style.display="none";
+    canvas.style.display="none";
   }
 }
 
 //Rendu de l'HTML pour la moyenne des cuisines
 function showAvgCuisine(data) {
-  var html = "<b>Score moyen par cuisine :</b><br><br>";
+  let html="<h5>Score moyen par cuisine</h5>";
   data.forEach(avgCuisine => {
-    html += `${avgCuisine._id} : <span class="fw-bold">${avgCuisine.scoreMoyen.toFixed(2)}</span><br>`;
+    html+= `
+      <div class="cuisine-item">
+        <b>${avgCuisine._id}</b>
+        Score moyen : <span class="score">${avgCuisine.scoreMoyen.toFixed(2)}</span>
+      </div>
+    `;
+  });
+  return html;
+}
+
+function showDistCuisine(data) {
+  let html="<h5>Distribution des scores par cuisine</h5>";
+  data.forEach(distCuisine => {
+    html+= `
+      <div class="cuisine-item">
+        <b>${distCuisine.cuisine}</b>
+        <div>Nombre de scores : <span class="text-muted">${distCuisine.count}</span></div>
+        <div>
+          Min : <span class="min">${distCuisine.min}</span> | 
+          Max : <span class="max">${distCuisine.max}</span>
+        </div>
+      </div>
+    `;
   });
   return html;
 }
@@ -550,7 +630,7 @@ if (filterResetBtn) {
 
 
 document.getElementById("display-mode").addEventListener("change", () => {
-  const selectedStat = document.getElementById("stats-select").value;
+  const selectedStat=document.getElementById("stats-select").value;
   loadStats(selectedStat);
 });
 

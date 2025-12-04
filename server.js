@@ -1,8 +1,8 @@
 import express from "express";
-
 import {
   getData,
   getAvgScoreCuisine,
+  getDistributionScoresByCuisine,
   insertRestaurant,
   getDataById,
   updateRestaurant,
@@ -65,6 +65,18 @@ app.get("/api/items/avg/cuisine", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({error:"Erreur lors de la récupération des données"});
+  }
+});
+
+
+// Route API pour renvoyer la distribution des scores par cuisine
+app.get("/api/items/dist/cuisine", async (req, res) => {
+  try {
+    const data = await getDistributionScoresByCuisine();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la récupération de la distribution des scores" });
   }
 });
 
