@@ -12,45 +12,155 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <!-- JS du plugin de clustering -->
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
+    body {
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #f3f6ff 0, #eef1f7 40%, #e4e7ee 100%);
+      color: #212529;
+    }
+
+    /* Titre principal en mode "bandeau" */
+    h2.m-3 {
+      position: relative;
+      margin: 0;
+      padding: 1.4rem 2rem 1.1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #111827;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.98));
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    }
+
+
+    /* CARTE */
+
     #map {
       height: calc(100vh - 80px);
       width: 100%;
       margin-top: 80px;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
     }
 
-    #stats-panel {
+    /* PANNEAUX FLOTTANTS (stats / filtres / légende) */
+
+    #stats-panel,
+    #filters-panel,
+    #legend-panel {
       position: fixed;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 0.9rem;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.15);
+      backdrop-filter: blur(6px);
+    }
+
+    /* Stats à droite, en haut */
+    #stats-panel {
       top: 80px;
       right: 20px;
-      z-index: 1000;
+      width: 360px;
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      padding: 1.1rem 1.1rem 1.25rem 1.1rem;
+    }
+
+    /* Filtres à gauche */
+    #filters-panel {
+      top: 140px;
+      left: 20px;
       width: 300px;
     }
 
+    /* Légende en bas à droite */
+    #legend-panel {
+      bottom: 20px;
+      right: 20px;
+      width: 260px;
+    }
+
+    /* Titres de cartes */
+    #filters-panel .card-title,
+    #legend-panel .card-title,
+    #stats-panel h5 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #495057;
+    }
+
+    /* Contenu stats */
     #stats-content {
       max-height: 250px;
       overflow-y: auto;
+      padding: 0.5rem;
+      background-color: #ffffff;
+      border: 1px solid #dee2e6;
+      border-radius: 0.6rem;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
     }
 
-    #filters-panel {
-      position: fixed;
-      top: 360px;       /* en dessous du panneau stats */
-      left: 20px;
-      z-index: 1000;
-      width: 300px;
+    #stats-content div.cuisine-item {
+      margin-bottom: 0.75rem;
+      padding: 0.5rem 0.65rem;
+      background-color: #f5f7fb;
+      border-radius: 0.5rem;
     }
 
-    @media (max-width: 768px) {
-      #stats-panel,
-      #filters-panel {
-          position: static;
-          width: auto;
-          margin: 0 1rem 1rem 1rem;
-      }
+    #stats-content div.cuisine-item b {
+      display: block;
+      margin-bottom: 0.15rem;
+      color: #343a40;
     }
 
-    /* petit rond de couleur dans la legende */
+    #stats-content span.score {
+      font-weight: 600;
+      color: #0d6efd;
+    }
+
+    #stats-content span.min {
+      color: #dc3545;
+      font-weight: 600;
+    }
+
+    #stats-content span.max {
+      color: #198754;
+      font-weight: 600;
+    }
+
+    /* Lignes de formulaires dans les panneaux */
+    #filters-panel .form-label,
+    #stats-panel .form-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #6c757d;
+    }
+
+    #filters-panel .form-select,
+    #filters-panel .form-control,
+    #stats-panel .form-select {
+      font-size: 0.85rem;
+    }
+
+    /* Boutons des panneaux */
+    #filters-panel .btn,
+    #stats-panel .btn {
+      border-radius: 999px;
+      font-size: 0.8rem;
+      padding-inline: 0.9rem;
+    }
+
+    /* Légende des scores */
     .legend-color-box {
       display: inline-block;
       width: 14px;
@@ -71,109 +181,163 @@
       background-color: #dc3545; /* rouge */
     }
 
-    #legend-panel {
-      position: fixed;
-      bottom: 20px;       /* en dessous de tes panneaux à gauche ou à droite, adapte au besoin */
-      right: 20px;
-      z-index: 1000;
-      width: 260px;
-    }
+    /* RESPONSIVE */
 
-    @media (max-width: 768px) {
+    @media (max-width: 992px) {
+      #stats-panel,
+      #filters-panel,
       #legend-panel {
         position: static;
         width: auto;
         margin: 0 1rem 1rem 1rem;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+      }
+
+      #map {
+        height: calc(100vh - 260px);
+        margin-top: 0;
       }
     }
 
-    #stats-panel {
-      position: fixed;
-      top: 80px;
-      right: 20px;
-      z-index: 1000;
-      width: 350px;
-      max-height: calc(100vh - 100px);
-      overflow-y: auto;
-      padding: 1rem;
-      background-color: #f8f9fa;
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    /* LEAFLET & CLUSTERS */
+
+    /* Popup plus moderne */
+    .leaflet-popup-content-wrapper {
+      border-radius: 0.85rem;
+      box-shadow: 0 14px 35px rgba(15, 23, 42, 0.25);
     }
 
-    #stats-panel h5 {
+    .leaflet-popup-content {
+      margin: 10px 14px;
+      font-size: 0.9rem;
+    }
+
+    /* Bouton Restaurants proches dans le popup */
+    .leaflet-popup-content .popup-near-btn {
+      font-size: 0.7rem;
+      border-radius: 999px;
+    }
+
+    /* Clusters plus "dashboard" */
+    .marker-cluster-small,
+    .marker-cluster-medium,
+    .marker-cluster-large {
+      background-color: rgba(13, 110, 253, 0.15);
+      border-radius: 50%;
+    }
+
+    .marker-cluster-small div,
+    .marker-cluster-medium div,
+    .marker-cluster-large div {
+      background-color: #0d6efd;
+      color: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3);
       font-weight: 600;
-      margin-bottom: 1rem;
-      border-bottom: 1px solid #dee2e6;
-      padding-bottom: 0.5rem;
+      border: 2px solid #ffffff;
     }
 
-    #stats-content {
-      max-height: 250px;
-      overflow-y: auto;
-      padding: 0.5rem;
-      background-color: #ffffff;
-      border: 1px solid #dee2e6;
-      border-radius: 0.5rem;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    /* On augmente légèrement la taille sur les gros groupes */
+    .marker-cluster-small div {
+      width: 28px;
+      height: 28px;
+      line-height: 28px;
     }
 
-    #stats-content div.cuisine-item {
-      margin-bottom: 0.75rem;
-      padding: 0.5rem;
-      background-color: #f1f3f5;
-      border-radius: 0.5rem;
+    .marker-cluster-medium div {
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
     }
 
-    #stats-content div.cuisine-item b {
-      display: block;
-      margin-bottom: 0.25rem;
-      color: #343a40;
+    .marker-cluster-large div {
+      width: 36px;
+      height: 36px;
+      line-height: 36px;
     }
 
-    #stats-content span.score {
-      font-weight: 600;
-      color: #0d6efd;
+    /* Contrôles de zoom Leaflet un peu plus propres */
+    .leaflet-control-zoom a {
+      border-radius: 8px !important;
     }
 
-    #stats-content span.min {
-      color: #dc3545;
-      font-weight: 600;
-    }
+    /* POPUP : icône EDIT */
 
-    #stats-content span.max {
-      color: #198754;
-      font-weight: 600;
-    }
-    .edit-icon {
-      width: 22px;      /* taille de l’icône */
-      cursor: pointer;  /* pour montrer que c’est cliquable */
-      opacity: 0.8;     
-      transition: opacity 0.2s;
-    }
-
-    .edit-icon:hover {
-      opacity: 1;       /* effet simple au survol */
-    }
-    /* conteneur du bouton EDIT dans le popup */
     .popup-edit-container {
       width: 100%;
       display: flex;
-      justify-content: center;   /* centrer horizontalement */
+      justify-content: center;
       margin-top: 8px;
       margin-bottom: 4px;
     }
 
-    /* style de l’icône */
     .edit-icon {
       width: 22px;
       cursor: pointer;
       opacity: 0.85;
-      transition: opacity 0.2s;
+      transition: opacity 0.2s, transform 0.12s;
     }
 
     .edit-icon:hover {
       opacity: 1;
+      transform: scale(1.06);
+    }
+
+    /* MODALS */
+
+    .modal-content {
+      border-radius: 1rem;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+    }
+
+    .modal-header {
+      border-bottom: 1px solid #e5e7eb;
+      background: linear-gradient(90deg, rgba(13, 110, 253, 0.05), rgba(13, 202, 240, 0.03));
+    }
+
+    .modal-title {
+      font-weight: 600;
+    }
+
+    .modal-footer {
+      border-top: 1px solid #e5e7eb;
+    }
+
+    /* Champs du formulaire modal */
+    #add-form .form-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #6c757d;
+    }
+
+    #add-form .form-control {
+      font-size: 0.85rem;
+    }
+
+    /* Boutons modals */
+    #add-form .btn {
+      border-radius: 999px;
+      font-size: 0.8rem;
+    }
+
+    /* SLIDER NEAR MODAL */
+
+    #near-modal .modal-content {
+      border-radius: 0.9rem;
+    }
+
+    #near-range {
+      width: 100%;
+    }
+
+    #near-range::-webkit-slider-thumb {
+      background-color: #0d6efd;
+    }
+
+    /* BOUTON STATS FLOTTANT (mobile) */
+
+    #stats-open-btn {
+      border-radius: 999px;
     }
 
   </style>

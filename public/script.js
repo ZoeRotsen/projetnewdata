@@ -514,7 +514,7 @@ function showDistCuisine(data) {
 
 //Afficher l'html des points les plus proches dans le panneau
 function showNearRestaurants(nearPoints) {
-  var html=`<div id="statsResults"><h5>Restaurants trouvés à proximité</h5>`;
+  var html=`<div id="statsResults"><h5>(${nearPoints.length}) Restaurants trouvés à proximité</h5>`;
   if (!nearPoints.length) {
     html+="<div class='text-muted'>Aucun restaurant trouvé dans ce rayon.</div>";
   } else{
